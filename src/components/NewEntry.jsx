@@ -82,12 +82,14 @@ export default function NewEntry({ masterData, onSuccess, showToast, prefillData
     }
 
     try {
+      const now = new Date().toISOString();
       await addDoc(collection(db, 'entries'), {
         ...form,
         baseRarity,
         additionalRarity,
         totalRarity,
-        createdAt: new Date().toISOString()
+        createdAt: now,
+        timestamp: now,
       });
 
       if (prefillData?.pendingId) {

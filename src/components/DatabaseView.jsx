@@ -196,7 +196,7 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
                 <th onClick={() => handleSort('variant')} className={sortKey === 'variant' ? 'sorted' : ''}>Variant<SortIcon column="variant" /></th>
                 <th onClick={() => handleSort('color')} className={sortKey === 'color' ? 'sorted' : ''}>Color<SortIcon column="color" /></th>
                 <th>Attr</th>
-                <th onClick={() => handleSort('status')} className={sortKey === 'status' ? 'sorted' : ''}>Status<SortIcon column="status" /></th>
+                <th>Notes</th>
                 <th onClick={() => handleSort('year')} className={sortKey === 'year' ? 'sorted' : ''}>Year<SortIcon column="year" /></th>
                 <th onClick={() => handleSort('timestamp')} className={sortKey === 'timestamp' ? 'sorted' : ''}>Added<SortIcon column="timestamp" /></th>
                 <th onClick={() => handleSort('totalRarity')} className={sortKey === 'totalRarity' ? 'sorted' : ''}>Rarity<SortIcon column="totalRarity" /></th>
@@ -230,7 +230,7 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
                         {moreCount > 0 && <span className="attr-more">+{moreCount}</span>}
                       </div>
                     </td>
-                    <td><span className={`status-dot ${entry.status}`}>{entry.status}</span></td>
+                    <td className="cell-secondary" style={{ maxWidth: '180px' }}>{entry.notes || '—'}</td>
                     <td className="cell-mono">{entry.year || '—'}</td>
                     <td className="cell-secondary" style={{ fontSize: '11px' }}>{formatDate(entry.timestamp)}</td>
                     <td className="cell-mono">{entry.totalRarity || 0}</td>
