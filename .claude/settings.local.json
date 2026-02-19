@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Vibe Coding Projects\\\\JDMDBv2\" ls-files)",
+      "Bash(dir \"C:\\\\Vibe Coding Projects\\\\JDMDBv2\")"
+    ]
+  }
+}
