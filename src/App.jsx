@@ -30,10 +30,9 @@ export default function App() {
   const fetchData = async () => {
     console.log('Fetching data from Firebase...')
     try {
-      const [masterSnap, entriesSnap, pendingSnap] = await Promise.all([
+      const [masterSnap, entriesSnap] = await Promise.all([
         getDocs(collection(db, 'masterData')),
         getDocs(collection(db, 'entries')),
-        getDocs(collection(db, 'pendingSubmissions'))
       ])
 
       const masterList = masterSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
@@ -54,16 +53,23 @@ export default function App() {
       })
       setEntries(entriesList)
 
-      const pendingList = pendingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      pendingList.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-      setPendingSubmissions(pendingList)
-
-      console.log('✅ Loaded:', masterList.length, 'master,', entriesList.length, 'entries,', pendingList.length, 'pending')
+      console.log('✅ Loaded:', masterList.length, 'master,', entriesList.length, 'entries')
     } catch (err) {
-      console.error('❌ Firebase error:', err)
+      console.error('❌ Firebase fetch error:', err)
       showToast('Failed to load data: ' + err.message, 'error')
     } finally {
       setLoading(false)
+    }
+
+    // Pending submissions fetched separately — a failure here must not block main data
+    try {
+      const pendingSnap = await getDocs(collection(db, 'pendingSubmissions'))
+      const pendingList = pendingSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      pendingList.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
+      setPendingSubmissions(pendingList)
+      console.log('✅ Loaded:', pendingList.length, 'pending')
+    } catch (err) {
+      console.error('❌ Pending submissions fetch error:', err)
     }
   }
 

@@ -99,6 +99,7 @@ export default function NewEntry({ masterData, onSuccess, showToast, prefillData
         onSuccess();
       }
     } catch (err) {
+      console.error('❌ Entry submission error:', err)
       showToast('Failed to add entry', 'error');
     }
   };
