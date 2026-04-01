@@ -4,8 +4,28 @@ import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ExternalLink, Pencil, Trash2, Download, X, ChevronUp, ChevronDown } from 'lucide-react';
 import EditModal from './EditModal';
 
+const ATTRIBUTES = [
+  { key: 'hof',          label: 'Hall of Fame' },
+  { key: 'bodykit',      label: 'Bodykit' },
+  { key: 'aeromods',     label: 'Aero Mods' },
+  { key: 'disrespected', label: 'Disrespected' },
+  { key: 'rareoem',      label: 'Rare OEM' },
+  { key: 'rareafter',    label: 'Rare Aftermarket' },
+  { key: 'frontswap',    label: 'Front Swap' },
+  { key: 'trackday',     label: 'Trackday' },
+  { key: 'drift',        label: 'Drift' },
+  { key: 'livery',       label: 'Livery' },
+  { key: 'rims',         label: 'Rims' },
+  { key: 'vip',          label: 'VIP' },
+  { key: 'stance',       label: 'Stance' },
+  { key: 'twotone',      label: 'Two-tone' },
+  { key: 'showcar',      label: 'Showcar' },
+];
+
 export default function DatabaseView({ entries, masterData, onRefresh, showToast }) {
   const [filters, setFilters] = useState({ make: '', model: '', variant: '', color: '', status: '', year: '' });
+  const [activeAttrs, setActiveAttrs] = useState(new Set());
+  const [showOrphans, setShowOrphans] = useState(false);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('timestamp');
   const [sortDir, setSortDir] = useState('desc');
@@ -19,6 +39,15 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
   const colors = useMemo(() => [...new Set(entries.map(e => e.color).filter(Boolean))].sort(), [entries]);
   const years = useMemo(() => [...new Set(entries.map(e => e.year).filter(Boolean))].sort((a, b) => b - a), [entries]);
 
+  const toggleAttr = (key) => {
+    setActiveAttrs(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+    setPage(1);
+  };
+
   const filtered = useMemo(() => {
     let result = entries.filter(e => {
       if (filters.make && e.make !== filters.make) return false;
@@ -27,6 +56,16 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
       if (filters.color && e.color !== filters.color) return false;
       if (filters.status && e.status !== filters.status) return false;
       if (filters.year && e.year !== filters.year) return false;
+      if (activeAttrs.size > 0) {
+        for (const key of activeAttrs) {
+          if (!e.specs?.[key]) return false;
+        }
+      }
+      if (showOrphans) {
+        const hasScore = (e.additionalRarity ?? 0) > 0;
+        const hasFlags = ATTRIBUTES.some(a => e.specs?.[a.key]);
+        if (!hasScore || hasFlags) return false;
+      }
       if (search) {
         const term = search.toLowerCase();
         const searchable = `${e.make} ${e.model} ${e.variant} ${e.color} ${e.notes || ''}`.toLowerCase();
@@ -54,7 +93,7 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
     });
 
     return result;
-  }, [entries, filters, search, sortKey, sortDir]);
+  }, [entries, filters, activeAttrs, showOrphans, search, sortKey, sortDir]);
 
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
   const totalPages = Math.ceil(filtered.length / perPage);
@@ -104,11 +143,13 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
 
   const clearFilters = () => {
     setFilters({ make: '', model: '', variant: '', color: '', status: '', year: '' });
+    setActiveAttrs(new Set());
+    setShowOrphans(false);
     setSearch('');
     setPage(1);
   };
 
-  const hasFilters = Object.values(filters).some(Boolean) || search;
+  const hasFilters = Object.values(filters).some(Boolean) || activeAttrs.size > 0 || showOrphans || search;
 
   const getAttrList = (specs) => {
     if (!specs) return [];
@@ -184,6 +225,25 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
               <Download /> CSV
             </button>
           </div>
+        </div>
+
+        <div className="attr-filter-row">
+          {ATTRIBUTES.map(attr => (
+            <button
+              key={attr.key}
+              className={`attr-filter-btn${activeAttrs.has(attr.key) ? ' active' : ''}${attr.key === 'hof' ? ' hof' : ''}`}
+              onClick={() => toggleAttr(attr.key)}
+            >
+              {attr.label}
+            </button>
+          ))}
+          <span className="attr-filter-divider" />
+          <button
+            className={`attr-filter-btn orphan${showOrphans ? ' active' : ''}`}
+            onClick={() => { setShowOrphans(v => !v); setPage(1); }}
+          >
+            Untagged Score
+          </button>
         </div>
 
         <div className="table-wrapper">

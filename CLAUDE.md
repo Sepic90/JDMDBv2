@@ -86,10 +86,21 @@ src/
   "additionalRarity": 5,
   "totalRarity": 13,
   "specs": {
-    "bodykit": true,
+    "bodykit": false,
+    "aeromods": false,
+    "disrespected": false,
+    "rareoem": false,
+    "rareafter": false,
+    "frontswap": false,
+    "trackday": false,
     "drift": false,
+    "livery": false,
+    "rims": false,
+    "vip": false,
+    "stance": false,
+    "twotone": false,
+    "showcar": false,
     "hof": false
-    // ...all attribute flags
   },
   "createdAt": "<ISO timestamp>",
   "timestamp": "<ISO timestamp>"

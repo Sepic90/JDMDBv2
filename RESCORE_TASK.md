@@ -1,53 +1,52 @@
 # Re-score Task — V1 → V2 Point System Migration
 
-## The Problem
+## Status: Partially Complete (2026-04-02)
 
-The database contains entries from two eras with different scoring systems:
+---
 
-- **V1 (old)**: `additionalRarity` was manually entered as a number. The `specs` checkboxes may not have been set — the notes field was often used to describe what earned the extra points instead.
-- **V2 (current)**: `additionalRarity` is auto-calculated by summing the points of checked `specs` flags (bodykit, rims, drift, etc.).
+## What Was Done
 
-This means ~85% of entries may have a non-zero `additionalRarity` that does not reflect the current attribute flag system.
+### 1. V1 Key Migration — COMPLETE
+Six camelCase V1 spec keys were renamed to their V2 lowercase equivalents across 185 entries.
 
-## Current Scoring Rules (V2)
+| V1 key (old) | V2 key (canonical) | Entries affected |
+|---|---|---|
+| `aeroMods` | `aeromods` | 112 |
+| `hallOfFame` | `hof` | 23 |
+| `rareOEM` | `rareoem` | 20 |
+| `rareAftermarket` | `rareafter` | 15 |
+| `twoTone` | `twotone` | 13 |
+| `frontSwap` | `frontswap` | 2 |
 
-**Total Rarity = Base Rarity + Additional Rarity**
+Script used: `migrate-v1-keys.js`
 
-| Points | Attributes |
+### 2. Mismatch Rescore — COMPLETE
+254 entries had spec flags set but `additionalRarity` didn't match the flags sum (V1 manual scores mixed with partial V2 flags). These were recalculated from flags and updated.
+
+Script used: `rescore-mismatches.js`
+
+---
+
+## What Remains
+
+### V1 Orphans — 76 entries — MANUAL WORK NEEDED
+These entries have `additionalRarity > 0` but **zero spec flags set** — they were logged in V1 with a manually typed score and no checkboxes. There is nothing to recalculate from; they need to be opened individually in the app and re-tagged.
+
+Priority order for re-tagging:
+1. Entries with descriptive notes (notes mention mods like "TE37", "Nismo bodykit", "aero kit") — these make it obvious which flags to set
+2. Entries with no notes and a small additional score (e.g. `additional=1`) — lower priority, may need the Street View URL for reference
+
+Script `diagnose-scores.js` will still list all orphans if needed as a working reference.
+
+---
+
+## Diagnostic & Migration Scripts
+
+| Script | Purpose |
 |---|---|
-| 1 pt each | Bodykit, Aero Mods, Disrespected, Front Swap, Track Day, Drift, Livery, Rims, VIP, Stance, Two-tone |
-| 2 pts each | Rare OEM, Rare Aftermarket, Showcar |
-| 5 pts | Hall of Fame |
+| `diagnose-scores.js` | Read-only. Reports entry score categories (clean / V2 match / orphan / mismatch) |
+| `diagnose-keys.js` | Read-only. Scans all specs objects for unknown keys |
+| `rescore-mismatches.js` | Dry-run + write. Recalculates additionalRarity from flags for mismatch entries |
+| `migrate-v1-keys.js` | Dry-run + write. Renames V1 camelCase keys to V2 lowercase equivalents |
 
-## The Blocker — Needs Verification First
-
-**Before doing anything, check whether old V1 entries have their `specs` flags populated in Firestore.**
-
-Steps:
-1. Open the Firebase console → `jdmdb-498da` project → Firestore → `entries` collection
-2. Click on an older entry that has `Additional > 0`
-3. Check what the `specs` field looks like
-
-**If `specs` has flags set** (e.g. `{ rims: true, bodykit: true }`) → re-score is safe. A script can recalculate `additionalRarity` by summing the flags and update `totalRarity = baseRarity + additionalRarity`.
-
-**If `specs` is empty or missing** → re-score from flags would zero out additional points on old entries. A different approach would be needed (e.g. manually re-tagging entries, or interpreting the notes field as hints).
-
-## What the CSV Told Us
-
-A full export (`jdmdb-export-2026-04-01.csv`) was reviewed. The CSV only exports `Base`, `Additional`, `Total` as numbers — no `specs` columns. It cannot be used to drive a re-score on its own.
-
-Pattern observed in old entries: notes like `"TE37"`, `"Nismo Bodykit"`, `"VeilSide Combat C1 bodykit"` describe what earned the extra points — suggesting specs may have been left unchecked and described in notes instead.
-
-## Next Steps
-
-1. Verify `specs` field state on a V1 entry (see above)
-2. Report back to Claude with findings
-3. If specs are populated: Claude writes a migration script that reads all entries, recalculates `additionalRarity` from `specs`, and batch-updates Firestore
-4. If specs are empty: decide on approach (manual re-tag vs. notes parsing vs. leaving as-is)
-
-## Safe Migration Workflow (when ready)
-
-1. Export full CSV backup first (already done: `jdmdb-export-2026-04-01.csv`)
-2. Run a dry-run preview script (old score → new score, no writes)
-3. Review the preview output
-4. Confirm, then run the actual update script
+All scripts are safe to re-run for verification. Write mode requires explicit `--write` flag.
