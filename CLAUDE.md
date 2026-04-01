@@ -17,8 +17,8 @@ JDMDB v2 is a web-based **Operations Console for cataloging JDM (Japanese Domest
 | Database | Firebase Firestore (NoSQL) |
 | Hosting | Firebase Hosting |
 | Icons | Lucide React |
-| Styling | Custom CSS (single file, 1800+ lines) |
-| Typography | IBM Plex Mono + IBM Plex Sans |
+| Styling | Custom CSS (single file, 2100+ lines) |
+| Typography | JetBrains Mono + Inter |
 
 No auth, no backend server — fully serverless via Firebase.
 
@@ -48,7 +48,7 @@ src/
 ├── index.css                 # All styles (CSS variables, layout, components)
 └── components/
     ├── Showroom.jsx           # Analytics dashboard (15+ stat widgets)
-    ├── NewEntry.jsx           # Entry submission form + rarity calculator
+    ├── NewEntry.jsx           # Entry submission form + rarity calculator + quick-add modal
     ├── DatabaseView.jsx       # Data grid — filter, sort, edit, delete, export
     ├── EditModal.jsx          # Modal for editing existing entries
     ├── SettingsView.jsx       # Master data management + Excel import
@@ -146,13 +146,19 @@ src/
 Analytics view with 15+ stat widgets: total entries, collection power, average/max rarity, Hall of Fame rate, top 10 rankings, rarity tier distribution, top makes/models/variants, color distribution, year distribution, status breakdown (parked vs driving), attribute hotlist, most decorated car, rarest make.
 
 ### New Entry
-Form with cascading Make → Model → Variant dropdowns (from `masterData`), year (2005–2025), 16 color options, parked/driving status, attribute checkbox grid with live rarity calculator, notes, and submit. Also used as a prefill target when accepting pending submissions (URL + year locked in that mode).
+Two-panel layout. **Left panel (Vehicle)**: Year + Street View URL at the top, then cascading Make → Model → Variant selects, 16-color visual swatch picker, segmented Parked/Driving toggle, notes field. **Right panel (Rarity Score)**: live score equation display (`Base + Mods = Total`) with tier label and 4-segment tier progress bar, then attribute chips grouped by point value (+1pt / +2pt / +5pt HOF). Submit button bottom-right.
+
+Also used as a prefill target when accepting pending submissions (URL + year locked in that mode).
+
+**Quick-add modal**: A `+ Add new variant to master data` trigger below the vehicle selects opens a compact modal to add a new variant to `masterData` without leaving the form. Make/Model fields have autocomplete from existing data. On success, calls `onRefresh` to reload master data and auto-selects the new variant in the main form. Disabled during pending submission review.
+
+CSS namespace: `ne-*` for New Entry layout, `qam-*` for the quick-add modal.
 
 ### Database
 Data grid showing all `entries`. Filterable by make/model/variant/color/status/year and free-text search. Sortable by any column. Paginated at 25 rows. Edit (opens `EditModal`) and delete with confirmation. CSV export respects active filters.
 
-### Settings
-Admin panel for `masterData`. Add new variants with base rarity. Autocomplete for make/model fields. Search and sort existing variants. Delete variants. Bulk import from `.xlsx`/`.xls` via the XLSX CDN library — parses sheets and adds/updates variants, skipping duplicates.
+### Master Data
+(Tab id: `settings`, component: `SettingsView.jsx`) Admin panel for `masterData`. Add new variants with base rarity. Autocomplete for make/model fields. Search and sort existing variants. Delete variants. Bulk import from `.xlsx`/`.xls` via the XLSX CDN library — parses sheets and adds/updates variants, skipping duplicates.
 
 ### Submit Find
 Public form for external contributors. Stores URL + year + notes to `pendingSubmissions`. No authentication.
@@ -167,16 +173,18 @@ Moderation queue. Lists all pending submissions with date, link, and notes. Acce
 - **State management**: Centralized in `App.jsx` via `useState`. Props are drilled to children — no Context or Redux.
 - **Data fetching**: All Firestore data loaded on mount via `useEffect`. No real-time listeners — manual `fetchData()` refresh after mutations.
 - **Filtering/sorting/aggregations**: Computed client-side with `useMemo`.
-- **Styling**: Single monolithic `index.css`. CSS custom properties for theming. Operations console aesthetic — dark, dense, light background (#f0f2f6), blue accent (#4f7ef7).
+- **Styling**: Single monolithic `index.css`. CSS custom properties for theming. Operations console aesthetic — light background (#f0f2f6), blue accent (#4f7ef7).
 - **No `.env`**: Firebase config is embedded in source — acceptable for a public read/write database with no sensitive data.
+- **`onRefresh` prop**: `NewEntry` receives `onRefresh={fetchData}` from `App.jsx` so the quick-add modal can reload master data after writing a new variant.
 
 ---
 
 ## Design Aesthetic
 
 - Operations console / data terminal feel
-- Ultra-compact layouts (32px row heights, 40px inputs)
+- Compact layouts (34px inputs, tight spacing)
 - Left sidebar navigation
-- IBM Plex Mono for data, IBM Plex Sans for labels
-- Light theme with white card surfaces on a grey background
+- JetBrains Mono for data/labels, Inter for body text
+- Light theme with white card surfaces on a grey (#f0f2f6) background
 - Blue (#4f7ef7) primary action color
+- CSS namespacing convention: component-specific classes use short prefixes (`ne-`, `qam-`, etc.)
