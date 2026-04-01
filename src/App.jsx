@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'
 import { collection, getDocs } from 'firebase/firestore'
-import { Database, Plus, Settings, Trophy, Send, Inbox } from 'lucide-react'
+import { Database, Plus, Settings, Trophy, Send, Inbox, Table2 } from 'lucide-react'
 import NewEntry from './components/NewEntry'
 import DatabaseView from './components/DatabaseView'
 import Showroom from './components/Showroom'
@@ -100,7 +100,7 @@ export default function App() {
     { id: 'new', label: 'New Entry', icon: Plus, cta: true },
     { id: 'showroom', label: 'Showroom', icon: Trophy },
     { id: 'database', label: 'Database', icon: Database },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'settings', label: 'Master Data', icon: Table2 },
     { id: 'submit', label: 'Submit Find', icon: Send },
     { id: 'pending', label: 'Pending', icon: Inbox, badge: pendingSubmissions.length || null },
   ]
@@ -109,7 +109,7 @@ export default function App() {
     showroom: 'Showroom',
     new: pendingToAccept ? 'Review Submission' : 'New Entry',
     database: 'Database',
-    settings: 'Settings',
+    settings: 'Master Data',
     submit: 'Submit a Find',
     pending: 'Pending Submissions'
   }[activeTab] || ''
@@ -165,6 +165,7 @@ export default function App() {
                     fetchData()
                     showToast('Entry added successfully')
                   }}
+                  onRefresh={fetchData}
                   showToast={showToast}
                   prefillData={pendingToAccept}
                   onPendingComplete={handlePendingComplete}
