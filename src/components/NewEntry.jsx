@@ -76,7 +76,7 @@ export default function NewEntry({ masterData, onSuccess, showToast, prefillData
   };
 
   const handleSubmit = async () => {
-    if (!form.url || !form.make || !form.model || !form.variant) {
+    if (!form.url || !form.make || !form.model || !form.variant || !form.color) {
       showToast('Please fill in required fields', 'error');
       return;
     }

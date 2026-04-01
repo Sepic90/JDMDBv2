@@ -189,6 +189,27 @@ html, body, #root {
   opacity: 1;
 }
 
+.nav-item.cta {
+  background: #22c55e;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.nav-item.cta svg {
+  opacity: 1;
+}
+
+.nav-item.cta:hover {
+  background: #16a34a;
+  color: #fff;
+}
+
+.nav-item.cta.active {
+  background: #16a34a;
+  color: #fff;
+}
+
 /* Visual separator before "Submit Find" (5th nav item) */
 .sidebar-nav .nav-item:nth-child(5) {
   margin-top: var(--space-md);

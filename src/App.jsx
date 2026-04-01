@@ -11,7 +11,7 @@ import PendingSubmissions from './components/PendingSubmissions'
 import Toast from './components/Toast'
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('showroom')
+  const [activeTab, setActiveTab] = useState('new')
   const [masterData, setMasterData] = useState([])
   const [entries, setEntries] = useState([])
   const [pendingSubmissions, setPendingSubmissions] = useState([])
@@ -97,8 +97,8 @@ export default function App() {
   }
 
   const tabs = [
+    { id: 'new', label: 'New Entry', icon: Plus, cta: true },
     { id: 'showroom', label: 'Showroom', icon: Trophy },
-    { id: 'new', label: 'New Entry', icon: Plus },
     { id: 'database', label: 'Database', icon: Database },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'submit', label: 'Submit Find', icon: Send },
@@ -126,7 +126,7 @@ export default function App() {
           {tabs.map(tab => (
             <button
               key={tab.id}
-              className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
+              className={`nav-item ${tab.cta ? 'cta' : ''} ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
               <tab.icon size={16} />
