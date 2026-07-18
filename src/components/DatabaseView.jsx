@@ -33,6 +33,25 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
   const [editEntry, setEditEntry] = useState(null);
   const perPage = 25;
 
+  // Chronological archive numbers: N° 0001 = oldest entry
+  const chronoIndex = useMemo(() => {
+    const sorted = [...entries].sort(
+      (a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0)
+    );
+    const map = new Map();
+    sorted.forEach((e, i) => map.set(e.id, i + 1));
+    return map;
+  }, [entries]);
+
+  const fmtIdx = (id) => `N° ${String(chronoIndex.get(id) || 0).padStart(4, '0')}`;
+
+  const tierColor = (r) => {
+    if (r >= 15) return 'var(--tier-leg)';
+    if (r >= 10) return 'var(--tier-wild)';
+    if (r >= 5)  return 'var(--tier-mod)';
+    return 'var(--tier-stock)';
+  };
+
   const makes = useMemo(() => [...new Set(entries.map(e => e.make))].sort(), [entries]);
   const models = useMemo(() => [...new Set(entries.filter(e => !filters.make || e.make === filters.make).map(e => e.model))].sort(), [entries, filters.make]);
   const variants = useMemo(() => [...new Set(entries.filter(e => (!filters.make || e.make === filters.make) && (!filters.model || e.model === filters.model)).map(e => e.variant))].sort(), [entries, filters.make, filters.model]);
@@ -250,7 +269,7 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
           <table>
             <thead>
               <tr>
-                <th style={{ width: '60px' }}>View</th>
+                <th style={{ width: '80px' }}>N°</th>
                 <th onClick={() => handleSort('make')} className={sortKey === 'make' ? 'sorted' : ''}>Make<SortIcon column="make" /></th>
                 <th onClick={() => handleSort('model')} className={sortKey === 'model' ? 'sorted' : ''}>Model<SortIcon column="model" /></th>
                 <th onClick={() => handleSort('variant')} className={sortKey === 'variant' ? 'sorted' : ''}>Variant<SortIcon column="variant" /></th>
@@ -272,10 +291,18 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
                 return (
                   <tr key={entry.id}>
                     <td>
-                      {entry.url && (
-                        <a href={entry.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>
-                          View
+                      {entry.url ? (
+                        <a
+                          href={entry.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="idx-link"
+                          title="Open Street View"
+                        >
+                          {fmtIdx(entry.id)} ↗
                         </a>
+                      ) : (
+                        <span className="idx-plain">{fmtIdx(entry.id)}</span>
                       )}
                     </td>
                     <td>{entry.make}</td>
@@ -292,8 +319,11 @@ export default function DatabaseView({ entries, masterData, onRefresh, showToast
                     </td>
                     <td className="cell-secondary" style={{ maxWidth: '180px' }}>{entry.notes || '—'}</td>
                     <td className="cell-mono">{entry.year || '—'}</td>
-                    <td className="cell-secondary" style={{ fontSize: '11px' }}>{formatDate(entry.timestamp)}</td>
-                    <td className="cell-mono">{entry.totalRarity || 0}</td>
+                    <td className="cell-secondary" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>{formatDate(entry.timestamp)}</td>
+                    <td className="cell-mono">
+                      <span className="tier-dot" style={{ background: tierColor(entry.totalRarity || 0) }} />
+                      {entry.totalRarity || 0}
+                    </td>
                     <td>
                       <div className="row-actions">
                         <button className="row-action" onClick={() => setEditEntry(entry)}>

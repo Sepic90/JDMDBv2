@@ -187,7 +187,7 @@ export default function SettingsView({ masterData, onRefresh, showToast }) {
   return (
     <div>
       <div className="settings-section">
-        <div className="settings-title">Add New Entry</div>
+        <div className="settings-title">Add to Catalog<span className="jp">追加</span></div>
         <div className="settings-form">
           {/* Make with autocomplete */}
           <div ref={makeRef} style={{ position: 'relative' }}>
@@ -269,7 +269,7 @@ export default function SettingsView({ masterData, onRefresh, showToast }) {
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--ink-faint)' }}>
               {filtered.length} of {masterData.length} entries
             </span>
           </div>

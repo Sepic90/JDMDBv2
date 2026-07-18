@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'
 import { collection, getDocs } from 'firebase/firestore'
-import { Database, Plus, Settings, Trophy, Send, Inbox, Table2 } from 'lucide-react'
 import NewEntry from './components/NewEntry'
 import DatabaseView from './components/DatabaseView'
 import Showroom from './components/Showroom'
@@ -10,8 +9,17 @@ import SubmitFind from './components/SubmitFind'
 import PendingSubmissions from './components/PendingSubmissions'
 import Toast from './components/Toast'
 
+const NAV = [
+  { id: 'showroom', label: 'Collection', jp: 'コレクション' },
+  { id: 'new',      label: 'New Entry',  jp: '新規登録' },
+  { id: 'database', label: 'Registry',   jp: '記録簿' },
+  { id: 'settings', label: 'Catalog',    jp: '型録' },
+  { id: 'submit',   label: 'Submit',     jp: '投稿' },
+  { id: 'pending',  label: 'Inbox',      jp: '受信箱' },
+]
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('new')
+  const [activeTab, setActiveTab] = useState('showroom')
   const [masterData, setMasterData] = useState([])
   const [entries, setEntries] = useState([])
   const [pendingSubmissions, setPendingSubmissions] = useState([])
@@ -96,62 +104,80 @@ export default function App() {
     setActiveTab('pending')
   }
 
-  const tabs = [
-    { id: 'new', label: 'New Entry', icon: Plus, cta: true },
-    { id: 'showroom', label: 'Showroom', icon: Trophy },
-    { id: 'database', label: 'Database', icon: Database },
-    { id: 'settings', label: 'Master Data', icon: Table2 },
-    { id: 'submit', label: 'Submit Find', icon: Send },
-    { id: 'pending', label: 'Pending', icon: Inbox, badge: pendingSubmissions.length || null },
-  ]
-
-  const headerTitle = {
-    showroom: 'Showroom',
-    new: pendingToAccept ? 'Review Submission' : 'New Entry',
-    database: 'Database',
-    settings: 'Master Data',
-    submit: 'Submit a Find',
-    pending: 'Pending Submissions'
-  }[activeTab] || ''
+  const pageHead = {
+    showroom: {
+      title: 'The Collection', jp: 'コレクション',
+      desc: 'Records, milestones, and finds worth revisiting.',
+    },
+    new: pendingToAccept
+      ? { title: 'Review Submission', jp: '審査', desc: 'Assess a contributed find before it enters the registry.' }
+      : { title: 'New Entry', jp: '新規登録', desc: 'Catalog a new find into the registry.' },
+    database: {
+      title: 'The Registry', jp: '記録簿',
+      desc: 'Every documented sighting — indexed, searchable, exportable.',
+    },
+    settings: {
+      title: 'The Catalog', jp: '型録',
+      desc: 'The master reference of makes, models, and variants.',
+    },
+    submit: {
+      title: 'Submit a Find', jp: '投稿',
+      desc: 'Spotted something on Street View? Send it in for review.',
+    },
+    pending: {
+      title: 'Inbox', jp: '受信箱',
+      desc: 'Contributed finds awaiting review.',
+    },
+  }[activeTab]
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <span>JDM</span>DB
+      <header className="masthead">
+        <div className="masthead-inner">
+          <div className="brand" onClick={() => handleTabChange('showroom')}>
+            <span className="brand-mark">JDMDB</span>
+            <span className="brand-sub">Street View Archive</span>
+          </div>
+          <nav className="masthead-nav">
+            {NAV.map(item => (
+              <button
+                key={item.id}
+                className={`mnav-item ${activeTab === item.id ? 'active' : ''}`}
+                onClick={() => handleTabChange(item.id)}
+              >
+                <span className="mnav-label">
+                  {item.label}
+                  {item.id === 'pending' && pendingSubmissions.length > 0 && (
+                    <span className="mnav-dot">{pendingSubmissions.length}</span>
+                  )}
+                </span>
+                <span className="mnav-jp">{item.jp}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="masthead-meta">
+            <strong>{entries.length}</strong>
+            <span>records</span>
           </div>
         </div>
-        <nav className="sidebar-nav">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`nav-item ${tab.cta ? 'cta' : ''} ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => handleTabChange(tab.id)}
-            >
-              <tab.icon size={16} />
-              <span>{tab.label}</span>
-              {tab.badge ? <span className="nav-badge">{tab.badge}</span> : null}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="sidebar-stats">
-            <strong>{entries.length}</strong> entries
-          </div>
-        </div>
-      </aside>
+      </header>
 
-      <main className="main">
-        <header className="main-header">
-          <h1 className="main-title">{headerTitle}</h1>
-        </header>
+      <main className="page">
+        <div className="page-inner">
+          {pageHead && (
+            <div className="page-head">
+              <h1 className="page-title">
+                {pageHead.title}
+                <span className="jp">{pageHead.jp}</span>
+              </h1>
+              <p className="page-desc">{pageHead.desc}</p>
+            </div>
+          )}
 
-        <div className="main-content">
           {loading ? (
             <div className="loading">
               <div className="loading-spinner" />
-              Loading...
+              Opening the archive…
             </div>
           ) : (
             <>
@@ -163,7 +189,7 @@ export default function App() {
                   masterData={masterData}
                   onSuccess={() => {
                     fetchData()
-                    showToast('Entry added successfully')
+                    showToast('Entry added to the registry')
                   }}
                   onRefresh={fetchData}
                   showToast={showToast}

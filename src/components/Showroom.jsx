@@ -1,29 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Trophy, TrendingUp, Car, Star, BarChart3, Award,
-  Calendar, ExternalLink, Zap,
-  Flame, Target, Activity,
-  Lock, CheckCircle2, ArrowUp, ArrowDown, Minus, Layers
-} from 'lucide-react';
+import { useState, useMemo } from 'react';
 
 // ── Date helpers ──────────────────────────────────────────────────────
 const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  return x;
-};
-
-const startOfWeek = (d) => {
-  const x = startOfDay(d);
-  const day = x.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
-  return x;
-};
-
-const startOfMonth = (d) => {
-  const x = startOfDay(d);
-  x.setDate(1);
   return x;
 };
 
@@ -74,14 +54,14 @@ const timeAgo = (timestamp) => {
 };
 
 const tierFor = (r) => {
-  if (r >= 15) return { label: 'Legendary', cls: 'tier-pill-legendary' };
-  if (r >= 10) return { label: 'Wild',      cls: 'tier-pill-wild' };
-  if (r >= 5)  return { label: 'Modified',  cls: 'tier-pill-modified' };
-  return         { label: 'Stock',     cls: 'tier-pill-stock' };
+  if (r >= 15) return { label: 'Legendary',  color: 'var(--tier-leg)' };
+  if (r >= 10) return { label: 'Wild Build', color: 'var(--tier-wild)' };
+  if (r >= 5)  return { label: 'Modified',   color: 'var(--tier-mod)' };
+  return         { label: 'Stock',      color: 'var(--tier-stock)' };
 };
 
 export default function Showroom({ entries }) {
-  const [periodTab, setPeriodTab] = useState('week');
+  const [seed, setSeed] = useState(() => Math.random());
 
   const hofEntries = useMemo(() => entries.filter(e => e.specs?.hof), [entries]);
 
@@ -96,46 +76,25 @@ export default function Showroom({ entries }) {
     [entries, collectionPower]
   );
 
-  // ── Period stats ──────────────────────────────────────────────────────
-  const periodStats = useMemo(() => {
-    const now = new Date();
-    const thisWeekStart  = startOfWeek(now);
-    const lastWeekStart  = new Date(thisWeekStart);
-    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-    const thisMonthStart = startOfMonth(now);
-    const lastMonthStart = new Date(thisMonthStart);
-    lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-
-    const inRange = (e, start, end) => {
-      if (!e.timestamp) return false;
-      const t = new Date(e.timestamp).getTime();
-      return t >= start.getTime() && t < end.getTime();
-    };
-
-    const compute = (start, end) => {
-      const items = entries.filter(e => inRange(e, start, end));
-      const points = items.reduce((s, e) => s + (e.totalRarity || 0), 0);
-      const best = items.reduce(
-        (b, e) => (!b || (e.totalRarity || 0) > (b.totalRarity || 0)) ? e : b,
-        null
-      );
-      return { count: items.length, points, best };
-    };
-
-    return {
-      week: {
-        current: compute(thisWeekStart, new Date(now.getTime() + 1)),
-        prev:    compute(lastWeekStart, thisWeekStart),
-      },
-      month: {
-        current: compute(thisMonthStart, new Date(now.getTime() + 1)),
-        prev:    compute(lastMonthStart, thisMonthStart),
-      },
-    };
+  // ── Chronological index numbers (N° 0001 = oldest entry) ────────────
+  const chronoIndex = useMemo(() => {
+    const sorted = [...entries].sort(
+      (a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0)
+    );
+    const map = new Map();
+    sorted.forEach((e, i) => map.set(e.id, i + 1));
+    return map;
   }, [entries]);
 
-  const activePeriod = periodStats[periodTab];
-  const periodDelta  = activePeriod.current.points - activePeriod.prev.points;
+  const fmtIdx = (id) => `N° ${String(chronoIndex.get(id) || 0).padStart(4, '0')}`;
+
+  // ── From the archive: one random pull per visit ──────────────────────
+  const rediscovery = useMemo(() => {
+    if (!entries.length) return null;
+    const withUrl = entries.filter(e => e.url);
+    const pool = withUrl.length ? withUrl : entries;
+    return pool[Math.floor(seed * pool.length)];
+  }, [entries, seed]);
 
   // ── Records board ────────────────────────────────────────────────────
   const records = useMemo(() => {
@@ -204,7 +163,7 @@ export default function Showroom({ entries }) {
     return { current, longest };
   }, [entries]);
 
-  // ── Recent activity feed ─────────────────────────────────────────────
+  // ── Recent entries ───────────────────────────────────────────────────
   const recentEntries = useMemo(() => {
     return [...entries]
       .filter(e => e.timestamp)
@@ -212,13 +171,61 @@ export default function Showroom({ entries }) {
       .slice(0, 5);
   }, [entries]);
 
-  // ── Rarity tiers ─────────────────────────────────────────────────────
+  // ── Field activity heatmap (last 12 months) ──────────────────────────
+  const heatmap = useMemo(() => {
+    const counts = {};
+    entries.forEach(e => {
+      if (!e.timestamp) return;
+      const k = dayKey(new Date(e.timestamp));
+      counts[k] = (counts[k] || 0) + 1;
+    });
+
+    const end = startOfDay(new Date());
+    const start = new Date(end);
+    start.setDate(start.getDate() - 363);
+    // Align the first column to a Monday
+    const dow = start.getDay();
+    start.setDate(start.getDate() + (dow === 0 ? -6 : 1 - dow));
+
+    const weeks = [];
+    let max = 0;
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const week = [];
+      for (let i = 0; i < 7 && cursor <= end; i++) {
+        const k = dayKey(cursor);
+        const count = counts[k] || 0;
+        if (count > max) max = count;
+        week.push({ key: k, count });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      weeks.push(week);
+    }
+
+    const monthLabels = [];
+    let prevMonth = '';
+    weeks.forEach(week => {
+      const m = new Date(week[0].key).toLocaleDateString('en-GB', { month: 'short' });
+      monthLabels.push(m !== prevMonth ? m : '');
+      prevMonth = m;
+    });
+    // The first column is usually a partial month — suppress its label so
+    // the strip doesn't open with a duplicate month name
+    if (monthLabels.length > 1 && monthLabels[1] === '') monthLabels[0] = '';
+
+    return { weeks, monthLabels, max: Math.max(max, 1) };
+  }, [entries]);
+
+  const levelFor = (count) =>
+    count === 0 ? 0 : Math.min(4, Math.ceil((count / heatmap.max) * 4));
+
+  // ── Composition ──────────────────────────────────────────────────────
   const rarityTiers = useMemo(() => {
     const tiers = [
-      { label: 'Stock',      range: [0, 4],         color: 'var(--text-tertiary)', count: 0 },
-      { label: 'Modified',   range: [5, 9],         color: 'var(--info)',          count: 0 },
-      { label: 'Wild Build', range: [10, 14],       color: 'var(--accent)',        count: 0 },
-      { label: 'Legendary',  range: [15, Infinity], color: 'var(--warning)',       count: 0 },
+      { label: 'Stock',      range: [0, 4],         color: 'var(--tier-stock)', count: 0 },
+      { label: 'Modified',   range: [5, 9],         color: 'var(--tier-mod)',   count: 0 },
+      { label: 'Wild Build', range: [10, 14],       color: 'var(--tier-wild)',  count: 0 },
+      { label: 'Legendary',  range: [15, Infinity], color: 'var(--tier-leg)',   count: 0 },
     ];
     entries.forEach(e => {
       const r = e.totalRarity || 0;
@@ -228,8 +235,24 @@ export default function Showroom({ entries }) {
     return tiers;
   }, [entries]);
 
-  // ── Achievements ─────────────────────────────────────────────────────
-  const achievements = useMemo(() => {
+  const topMakes = useMemo(() => {
+    const counts = {};
+    entries.forEach(e => { if (e.make) counts[e.make] = (counts[e.make] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [entries]);
+
+  const topModels = useMemo(() => {
+    const counts = {};
+    entries.forEach(e => {
+      if (!e.make || !e.model) return;
+      const k = `${e.make} ${e.model}`;
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [entries]);
+
+  // ── Milestones ───────────────────────────────────────────────────────
+  const milestones = useMemo(() => {
     const total = entries.length;
     const power = collectionPower;
     const hofCount = hofEntries.length;
@@ -244,218 +267,321 @@ export default function Showroom({ entries }) {
     });
     const maxMakesInWeek = Math.max(0, ...Object.values(weeklyMakes).map(s => s.size));
 
-    const make = (id, label, desc, value, goal, icon) => ({
-      id, label, desc, value, goal, icon,
+    const make = (id, label, desc, value, goal) => ({
+      id, label, desc, value, goal,
       unlocked: value >= goal,
       pct: Math.min(100, Math.round((value / goal) * 100)),
     });
 
     return [
-      make('spot10',    '10 Spotted',     'Log 10 entries',              total, 10,   Car),
-      make('spot50',    '50 Spotted',     'Log 50 entries',              total, 50,   Car),
-      make('spot100',   'Century',        'Log 100 entries',             total, 100,  Star),
-      make('spot500',   'Spotter Elite',  'Log 500 entries',             total, 500,  Award),
-      make('hof1',      'First HOF',      'First Hall of Fame car',      hofCount, 1, Trophy),
-      make('hof5',      'HOF x5',         '5 Hall of Fame entries',      hofCount, 5, Trophy),
-      make('hof10',     'HOF Hunter',     '10 Hall of Fame entries',     hofCount, 10, Trophy),
-      make('pwr1k',     '1K Power',       'Reach 1,000 Power',           power, 1000, Zap),
-      make('pwr5k',     '5K Power',       'Reach 5,000 Power',           power, 5000, Zap),
-      make('streak7',   'Week Streak',    '7 days in a row',             longestStreak, 7, Flame),
-      make('variety',   'Variety Hunter', '5 makes in one week',         maxMakesInWeek, 5, Layers),
+      make('spot10',  '10 Spotted',     'Log 10 entries',          total, 10),
+      make('spot50',  '50 Spotted',     'Log 50 entries',          total, 50),
+      make('spot100', 'Century',        'Log 100 entries',         total, 100),
+      make('spot500', 'Spotter Elite',  'Log 500 entries',         total, 500),
+      make('hof1',    'First HOF',      'First Hall of Fame car',  hofCount, 1),
+      make('hof5',    'HOF ×5',         '5 Hall of Fame entries',  hofCount, 5),
+      make('hof10',   'HOF Hunter',     '10 Hall of Fame entries', hofCount, 10),
+      make('pwr1k',   '1K Power',       'Reach 1,000 Power',       power, 1000),
+      make('pwr5k',   '5K Power',       'Reach 5,000 Power',       power, 5000),
+      make('streak7', 'Week Streak',    '7 days in a row',         longestStreak, 7),
+      make('variety', 'Variety Hunter', '5 makes in one week',     maxMakesInWeek, 5),
     ];
   }, [entries, collectionPower, hofEntries, streaks]);
 
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const unlockedCount = milestones.filter(m => m.unlocked).length;
+
+  const redisTier = rediscovery ? tierFor(rediscovery.totalRarity || 0) : null;
 
   return (
-    <div className="sr">
+    <div className="col">
 
-      {/* ── Stats Strip ── */}
-      <div className="sr-strip">
-        <div className="sr-stat">
-          <Car size={14} />
-          <span className="sr-stat-val">{entries.length}</span>
-          <span className="sr-stat-lbl">spotted</span>
+      {/* ── Hero ── */}
+      <section className="col-hero">
+        <div className="col-hero-main">
+          <span className="col-hero-num">{entries.length}</span>
+          <span className="col-hero-lbl">records<span className="jp">記録</span></span>
         </div>
-        <div className="sr-stat">
-          <Zap size={14} />
-          <span className="sr-stat-val sr-purple">{collectionPower}</span>
-          <span className="sr-stat-lbl">power</span>
-        </div>
-        <div className="sr-stat">
-          <Trophy size={14} />
-          <span className="sr-stat-val sr-gold">{hofEntries.length}</span>
-          <span className="sr-stat-lbl">HOF</span>
-        </div>
-        <div className="sr-stat">
-          <Flame size={14} />
-          <span className="sr-stat-val sr-teal">{streaks.current}</span>
-          <span className="sr-stat-lbl">streak</span>
-          <span className="sr-stat-sub">best {streaks.longest}</span>
-        </div>
-        <div className="sr-stat">
-          <TrendingUp size={14} />
-          <span className="sr-stat-val">{avgRarity}</span>
-          <span className="sr-stat-lbl">avg</span>
-        </div>
-      </div>
-
-      {/* ── Period + Records row ── */}
-      <div className="sr-row">
-        {/* Period card */}
-        <div className="sr-card sr-period">
-          <div className="sr-card-head">
-            <span className="sr-card-title"><Activity size={12} /> This Period</span>
-            <div className="sr-period-tabs">
-              <button
-                className={`sr-ptab ${periodTab === 'week' ? 'active' : ''}`}
-                onClick={() => setPeriodTab('week')}
-              >Week</button>
-              <button
-                className={`sr-ptab ${periodTab === 'month' ? 'active' : ''}`}
-                onClick={() => setPeriodTab('month')}
-              >Month</button>
-            </div>
+        <div className="col-hero-stats">
+          <div className="col-stat">
+            <span className="col-stat-num">{collectionPower.toLocaleString('en-GB')}</span>
+            <span className="col-stat-lbl">power<span className="jp">収集力</span></span>
           </div>
-          <div className="sr-period-body">
-            <div className="sr-period-col">
-              <div className="sr-period-num sr-purple">{activePeriod.current.points}</div>
-              <div className="sr-period-lbl">points</div>
-              <div className={`sr-delta ${
-                periodDelta > 0 ? 'up' : periodDelta < 0 ? 'down' : 'flat'
-              }`}>
-                {periodDelta > 0 ? <ArrowUp size={10} /> : periodDelta < 0 ? <ArrowDown size={10} /> : <Minus size={10} />}
-                {periodDelta > 0 ? '+' : ''}{periodDelta}
+          <div className="col-stat">
+            <span className="col-stat-num">{hofEntries.length}</span>
+            <span className="col-stat-lbl">hall of fame<span className="jp">殿堂</span></span>
+          </div>
+          <div className="col-stat">
+            <span className="col-stat-num">{avgRarity}</span>
+            <span className="col-stat-lbl">avg rarity<span className="jp">平均</span></span>
+          </div>
+          <div className="col-stat">
+            <span className="col-stat-num">
+              {streaks.current}<em> / {streaks.longest}</em>
+            </span>
+            <span className="col-stat-lbl">streak · best<span className="jp">連続</span></span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── From the archive + Records ── */}
+      <div className="col-row">
+        <section className="col-sec">
+          <div className="col-sec-head">
+            <span className="col-sec-title">From the Archive<span className="jp">再発見</span></span>
+            <span className="col-sec-meta">one random pull per visit</span>
+          </div>
+          {rediscovery ? (
+            <div className="redis-card">
+              <div className="redis-top">
+                <span className="redis-idx">{fmtIdx(rediscovery.id)}</span>
+                <span className="tier-mark" style={{ color: redisTier.color }}>
+                  {redisTier.label} · {rediscovery.totalRarity || 0} pts
+                </span>
+              </div>
+              <div className="redis-name">{rediscovery.make} {rediscovery.model}</div>
+              <div className="redis-variant">
+                {rediscovery.variant}
+                {rediscovery.color ? ` — ${rediscovery.color}` : ''}
+                {rediscovery.status ? ` · ${rediscovery.status}` : ''}
+                {rediscovery.year ? ` · ${rediscovery.year}` : ''}
+              </div>
+              {rediscovery.notes && (
+                <p className="redis-notes">“{rediscovery.notes}”</p>
+              )}
+              <div className="redis-actions">
+                {rediscovery.url && (
+                  <a
+                    className="btn btn-primary btn-sm"
+                    href={rediscovery.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open Street View ↗
+                  </a>
+                )}
+                <button className="btn btn-ghost btn-sm" onClick={() => setSeed(Math.random())}>
+                  Show another →
+                </button>
               </div>
             </div>
-            <div className="sr-period-col">
-              <div className="sr-period-num sr-teal">{activePeriod.current.count}</div>
-              <div className="sr-period-lbl">finds</div>
-              <div className="sr-period-sub">{activePeriod.prev.count} prev</div>
+          ) : (
+            <div className="empty-note">The archive is empty — log your first find.</div>
+          )}
+        </section>
+
+        <section className="col-sec">
+          <div className="col-sec-head">
+            <span className="col-sec-title">Records<span className="jp">記録帳</span></span>
+          </div>
+          <div className="ledger">
+            <div className="ledger-row">
+              <span className="ledger-lbl">Current streak</span>
+              <span className="ledger-dots" />
+              <span className="ledger-val">{streaks.current} {streaks.current === 1 ? 'day' : 'days'}</span>
+              <span className="ledger-sub">best {streaks.longest}</span>
             </div>
-            <div className="sr-period-col sr-period-best">
-              {activePeriod.current.best ? (
-                <>
-                  <div className="sr-period-best-car">
-                    {activePeriod.current.best.make} {activePeriod.current.best.model}
-                  </div>
-                  <div className="sr-period-best-var">{activePeriod.current.best.variant}</div>
-                  <span className={`tier-pill ${tierFor(activePeriod.current.best.totalRarity || 0).cls}`}>
-                    {activePeriod.current.best.totalRarity || 0} pts
-                  </span>
-                </>
-              ) : (
-                <div className="sr-period-empty">No spots yet</div>
+            <div className="ledger-row">
+              <span className="ledger-lbl">Best day</span>
+              <span className="ledger-dots" />
+              <span className="ledger-val">{records.bestDay ? `${records.bestDay.value} pts` : '—'}</span>
+              {records.bestDay && <span className="ledger-sub">{formatDayKey(records.bestDay.key)}</span>}
+            </div>
+            <div className="ledger-row">
+              <span className="ledger-lbl">Best week</span>
+              <span className="ledger-dots" />
+              <span className="ledger-val">{records.bestWeek ? `${records.bestWeek.value} pts` : '—'}</span>
+              {records.bestWeek && <span className="ledger-sub">{formatWeekKey(records.bestWeek.key)}</span>}
+            </div>
+            <div className="ledger-row">
+              <span className="ledger-lbl">Best month</span>
+              <span className="ledger-dots" />
+              <span className="ledger-val">{records.bestMonth ? `${records.bestMonth.value} pts` : '—'}</span>
+              {records.bestMonth && <span className="ledger-sub">{formatMonthKey(records.bestMonth.key)}</span>}
+            </div>
+            <div className="ledger-row">
+              <span className="ledger-lbl">Top find</span>
+              <span className="ledger-dots" />
+              <span className="ledger-val">
+                {records.biggestFind ? `${records.biggestFind.totalRarity || 0} pts` : '—'}
+              </span>
+              {records.biggestFind && (
+                <span className="ledger-sub">
+                  {records.biggestFind.make} {records.biggestFind.model}
+                </span>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Records */}
-        <div className="sr-card sr-records">
-          <div className="sr-card-head">
-            <span className="sr-card-title"><Award size={12} /> Records</span>
-          </div>
-          <div className="sr-records-body">
-            <div className="sr-rec">
-              <div className="sr-rec-lbl">Best week</div>
-              <div className="sr-rec-val">{records.bestWeek ? `${records.bestWeek.value} pts` : '—'}</div>
-              <div className="sr-rec-sub">{records.bestWeek ? formatWeekKey(records.bestWeek.key) : ''}</div>
-            </div>
-            <div className="sr-rec">
-              <div className="sr-rec-lbl">Best month</div>
-              <div className="sr-rec-val">{records.bestMonth ? `${records.bestMonth.value} pts` : '—'}</div>
-              <div className="sr-rec-sub">{records.bestMonth ? formatMonthKey(records.bestMonth.key) : ''}</div>
-            </div>
-            <div className="sr-rec">
-              <div className="sr-rec-lbl">Best day</div>
-              <div className="sr-rec-val">{records.bestDay ? `${records.bestDay.value} pts` : '—'}</div>
-              <div className="sr-rec-sub">{records.bestDay ? formatDayKey(records.bestDay.key) : ''}</div>
-            </div>
-            <div className="sr-rec sr-rec-hero">
-              <div className="sr-rec-lbl">Top find</div>
-              <div className="sr-rec-val">{records.biggestFind ? `${records.biggestFind.totalRarity || 0} pts` : '—'}</div>
-              <div className="sr-rec-sub">
-                {records.biggestFind ? `${records.biggestFind.make} ${records.biggestFind.model}` : ''}
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
 
-      {/* ── Activity + Tiers row ── */}
-      <div className="sr-row">
-        {/* Recent Activity */}
-        <div className="sr-card sr-activity">
-          <div className="sr-card-head">
-            <span className="sr-card-title"><Activity size={12} /> Recent</span>
-          </div>
-          <div className="sr-feed">
-            {recentEntries.length > 0 ? recentEntries.map(entry => {
-              const tier = tierFor(entry.totalRarity || 0);
-              return (
-                <div key={entry.id} className="sr-feed-row">
-                  <span className="sr-feed-time">{timeAgo(entry.timestamp)}</span>
-                  <span className="sr-feed-car">{entry.make} {entry.model}</span>
-                  <span className={`tier-pill ${tier.cls}`}>{entry.totalRarity || 0}</span>
-                </div>
-              );
-            }) : (
-              <div className="sr-empty">No activity yet</div>
-            )}
-          </div>
+      {/* ── Hall of Fame ── */}
+      <section className="col-sec">
+        <div className="col-sec-head">
+          <span className="col-sec-title">Hall of Fame<span className="jp">殿堂</span></span>
+          <span className="col-sec-meta">
+            {hofEntries.length > 0 ? `${hofEntries.length} enshrined` : ''}
+          </span>
         </div>
-
-        {/* Rarity Tiers */}
-        <div className="sr-card sr-tiers">
-          <div className="sr-card-head">
-            <span className="sr-card-title"><Target size={12} /> Tiers</span>
-          </div>
-          <div className="sr-tiers-body">
-            {rarityTiers.map(tier => (
-              <div key={tier.label} className="sr-tier">
-                <span className="sr-tier-lbl" style={{ color: tier.color }}>{tier.label}</span>
-                <div className="sr-tier-bar">
-                  <div
-                    className="sr-tier-fill"
-                    style={{
-                      width: `${entries.length ? (tier.count / entries.length) * 100 : 0}%`,
-                      background: tier.color,
-                    }}
-                  />
+        {hofEntries.length > 0 ? (
+          <div className="hof-grid">
+            {hofEntries.map(e => (
+              <div key={e.id} className="hof-plate">
+                <div className="hof-top">
+                  <span className="hof-seal">殿堂</span>
+                  <span className="hof-idx">{fmtIdx(e.id)}</span>
                 </div>
-                <span className="sr-tier-ct">{tier.count}</span>
+                <div className="hof-name">{e.make} {e.model}</div>
+                <div className="hof-variant">{e.variant}</div>
+                <div className="hof-meta">
+                  <span>{[e.year, e.color].filter(Boolean).join(' · ') || '—'}</span>
+                  <span className="hof-pts">{e.totalRarity || 0} pts</span>
+                </div>
+                {e.url && (
+                  <a className="hof-link" href={e.url} target="_blank" rel="noopener noreferrer">
+                    Street View ↗
+                  </a>
+                )}
               </div>
             ))}
           </div>
+        ) : (
+          <div className="empty-note">No cars in the Hall of Fame yet — the first one earns its plate.</div>
+        )}
+      </section>
+
+      {/* ── Field activity ── */}
+      <section className="col-sec">
+        <div className="col-sec-head">
+          <span className="col-sec-title">Field Activity<span className="jp">活動</span></span>
+          <span className="col-sec-meta">last 12 months</span>
         </div>
+        <div className="heat-wrap">
+          <div className="heat-months">
+            {heatmap.monthLabels.map((m, i) => <span key={i}>{m}</span>)}
+          </div>
+          <div className="heat-grid">
+            {heatmap.weeks.map((week, wi) => (
+              <div key={wi} className="heat-col">
+                {week.map(d => (
+                  <div
+                    key={d.key}
+                    className={`heat-cell l${levelFor(d.count)}`}
+                    title={`${d.count} ${d.count === 1 ? 'find' : 'finds'} — ${formatDayKey(d.key)}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="heat-legend">
+            <span>less</span>
+            <div className="heat-cell l0" />
+            <div className="heat-cell l1" />
+            <div className="heat-cell l2" />
+            <div className="heat-cell l3" />
+            <div className="heat-cell l4" />
+            <span>more</span>
+          </div>
+        </div>
+        {recentEntries.length > 0 && (
+          <div className="heat-latest">
+            <div className="micro heat-latest-lbl">Latest five</div>
+            <div className="ledger">
+              {recentEntries.map(e => (
+                <div key={e.id} className="ledger-row">
+                  <span className="ledger-lbl dark">{e.make} {e.model}</span>
+                  <span className="ledger-dots" />
+                  <span className="ledger-val">{e.totalRarity || 0} pts</span>
+                  <span className="ledger-sub">{timeAgo(e.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── Composition ── */}
+      <div className="col-row col-row-3">
+        <section className="col-sec">
+          <div className="col-sec-head">
+            <span className="col-sec-title">Composition<span className="jp">構成</span></span>
+          </div>
+          <div className="tier-bar">
+            {rarityTiers.map(t => t.count > 0 && (
+              <div key={t.label} className="tier-seg" style={{ flex: t.count, background: t.color }} />
+            ))}
+          </div>
+          <div className="ledger">
+            {rarityTiers.map(t => (
+              <div key={t.label} className="ledger-row">
+                <span className="tier-dot" style={{ background: t.color }} />
+                <span className="ledger-lbl">{t.label}</span>
+                <span className="ledger-dots" />
+                <span className="ledger-val">{t.count}</span>
+                <span className="ledger-sub">
+                  {entries.length ? Math.round((t.count / entries.length) * 100) : 0}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="col-sec">
+          <div className="col-sec-head">
+            <span className="col-sec-title">Top Makes<span className="jp">メーカー</span></span>
+          </div>
+          <div className="ledger">
+            {topMakes.length ? topMakes.map(([name, count], i) => (
+              <div key={name} className="ledger-row">
+                <span className="rank-num">{String(i + 1).padStart(2, '0')}</span>
+                <span className="ledger-lbl dark">{name}</span>
+                <span className="ledger-dots" />
+                <span className="ledger-val">{count}</span>
+              </div>
+            )) : <div className="empty-note">Nothing logged yet.</div>}
+          </div>
+        </section>
+
+        <section className="col-sec">
+          <div className="col-sec-head">
+            <span className="col-sec-title">Top Models<span className="jp">車種</span></span>
+          </div>
+          <div className="ledger">
+            {topModels.length ? topModels.map(([name, count], i) => (
+              <div key={name} className="ledger-row">
+                <span className="rank-num">{String(i + 1).padStart(2, '0')}</span>
+                <span className="ledger-lbl dark">{name}</span>
+                <span className="ledger-dots" />
+                <span className="ledger-val">{count}</span>
+              </div>
+            )) : <div className="empty-note">Nothing logged yet.</div>}
+          </div>
+        </section>
       </div>
 
-      {/* ── Achievements ── */}
-      <div className="sr-card sr-achievements">
-        <div className="sr-card-head">
-          <span className="sr-card-title"><Award size={12} /> Achievements</span>
-          <span className="sr-card-meta">{unlockedCount}/{achievements.length}</span>
+      {/* ── Milestones ── */}
+      <section className="col-sec">
+        <div className="col-sec-head">
+          <span className="col-sec-title">Milestones<span className="jp">里程標</span></span>
+          <span className="col-sec-meta">{unlockedCount} of {milestones.length} reached</span>
         </div>
-        <div className="sr-ach-grid">
-          {achievements.map(a => {
-            const Icon = a.icon;
-            return (
-              <div key={a.id} className={`sr-ach ${a.unlocked ? 'unlocked' : 'locked'}`}>
-                <div className="sr-ach-icon">
-                  {a.unlocked ? <Icon size={13} /> : <Lock size={11} />}
+        <div className="mile-grid">
+          {milestones.map(m => (
+            <div key={m.id} className={`mile-row ${m.unlocked ? 'unlocked' : ''}`}>
+              <span className="mile-mark" />
+              <div className="mile-info">
+                <div className="mile-head">
+                  <span className="mile-name">{m.label}</span>
+                  <span className="mile-ct">{Math.min(m.value, m.goal)}/{m.goal}</span>
                 </div>
-                <div className="sr-ach-info">
-                  <div className="sr-ach-name">{a.label}</div>
-                  <div className="sr-ach-bar">
-                    <div className="sr-ach-fill" style={{ width: `${a.pct}%` }} />
-                  </div>
+                <div className="mile-bar">
+                  <div className="mile-fill" style={{ width: `${m.pct}%` }} />
                 </div>
+                <div className="mile-desc">{m.desc}</div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
-      </div>
+      </section>
 
     </div>
   );

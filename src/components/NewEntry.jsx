@@ -35,10 +35,10 @@ const ATTRS_2PT = [
 ];
 
 const RARITY_TIERS = [
-  { min: 15, label: 'LEGENDARY',  color: '#f59e0b' },
-  { min: 10, label: 'WILD BUILD', color: '#8b5cf6' },
-  { min: 5,  label: 'MODIFIED',   color: '#4f7ef7' },
-  { min: 0,  label: 'STOCK',      color: '#94a3b8' },
+  { min: 15, label: 'LEGENDARY',  color: 'var(--tier-leg)' },
+  { min: 10, label: 'WILD BUILD', color: 'var(--tier-wild)' },
+  { min: 5,  label: 'MODIFIED',   color: 'var(--tier-mod)' },
+  { min: 0,  label: 'STOCK',      color: 'var(--tier-stock)' },
 ];
 
 const getTier = (score) => RARITY_TIERS.find(t => score >= t.min) || RARITY_TIERS[3];
@@ -216,7 +216,7 @@ export default function NewEntry({ masterData, onSuccess, onRefresh, showToast, 
 
         {/* LEFT — Vehicle identity */}
         <div className="ne-panel ne-panel-vehicle">
-          <div className="ne-panel-hdr">Vehicle</div>
+          <div className="ne-panel-hdr">Vehicle<span className="jp">車両</span></div>
 
           <div className="ne-vehicle-selects">
             <div className="form-group">
@@ -269,8 +269,8 @@ export default function NewEntry({ masterData, onSuccess, onRefresh, showToast, 
                     style={{
                       background: hex || 'conic-gradient(from 0deg, #ef4444, #eab308, #22c55e, #3b82f6, #8b5cf6, #ef4444)',
                       boxShadow: isSelected
-                        ? `0 0 0 2px #fff, 0 0 0 4px var(--accent)`
-                        : color === 'White' ? 'inset 0 0 0 1px var(--border-default)' : undefined,
+                        ? `0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink)`
+                        : color === 'White' ? 'inset 0 0 0 1px var(--line-strong)' : undefined,
                     }}
                   >
                     {isSelected && (
@@ -319,26 +319,26 @@ export default function NewEntry({ masterData, onSuccess, onRefresh, showToast, 
           </div>
         </div>
 
-        {/* RIGHT — Rarity scoring */}
+        {/* RIGHT — Appraisal */}
         <div className="ne-panel">
-          <div className="ne-panel-hdr">Rarity Score</div>
+          <div className="ne-panel-hdr">Appraisal<span className="jp">査定</span></div>
 
-          {/* Score box — equation + tier bar in one contained unit */}
-          <div className="ne-score-box">
-            <div className="ne-score-eq">
-              <div className="ne-score-cell">
-                <span className="ne-score-num" style={{ color: 'var(--text-secondary)' }}>{baseRarity}</span>
-                <span className="ne-score-lbl">Base</span>
+          {/* Appraisal card — total, itemized lines, tier track */}
+          <div className="ne-appraisal">
+            <div className="ne-appraisal-top">
+              <span className="ne-total-num">{totalRarity}</span>
+              <span className="ne-total-tier" style={{ color: tier.color }}>{tier.label}</span>
+            </div>
+            <div className="ne-appraisal-lines">
+              <div className="ne-appr-line">
+                <span className="ne-appr-lbl">Base rarity</span>
+                <span className="ne-appr-dots" />
+                <span className="ne-appr-val">{baseRarity}</span>
               </div>
-              <span className="ne-score-op">+</span>
-              <div className="ne-score-cell">
-                <span className="ne-score-num" style={{ color: 'var(--success)' }}>+{additionalRarity}</span>
-                <span className="ne-score-lbl">Mods</span>
-              </div>
-              <span className="ne-score-op">=</span>
-              <div className="ne-score-cell">
-                <span className="ne-score-total">{totalRarity}</span>
-                <span className="ne-score-tier" style={{ color: tier.color }}>{tier.label}</span>
+              <div className="ne-appr-line">
+                <span className="ne-appr-lbl">Modifications</span>
+                <span className="ne-appr-dots" />
+                <span className="ne-appr-val">+{additionalRarity}</span>
               </div>
             </div>
             <div className="ne-tier-track">
@@ -406,7 +406,7 @@ export default function NewEntry({ masterData, onSuccess, onRefresh, showToast, 
       <div className="ne-footer">
         <button className="btn btn-primary ne-submit-btn" onClick={handleSubmit}>
           <Plus style={{ width: '14px', height: '14px' }} />
-          Add Entry
+          File Entry
         </button>
       </div>
 
